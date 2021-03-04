@@ -47,6 +47,14 @@ version control system that allows you to back up to previous states.
 
 To initialize in current working directory:
 
-git init -b main
+(venv) ~/ git init -b main
+
+Adding files to .gitignore so that they are not tracked:
+
+(venv) ~/ echo "file_or_directory" >> .gitignore
+
+It is generally good to add the ./venv/ directory to the .gitignore 
+
+Add any remaining files to 
 
 

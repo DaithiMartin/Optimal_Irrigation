@@ -4,9 +4,9 @@ import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
 
-from Dmoney.CES_version.CES_Ag_agent import Agent
-from Dmoney.CES_version.CES_Ag_sim import Multi_Farm_Sim
-from Dmoney.CES_version.config import SimConfig
+from CES_model.CES_Ag_agent import Agent
+from CES_model.CES_Ag_sim import Multi_Farm_Sim
+from CES_model.config import SimConfig
 
 
 def simulate(config: SimConfig):

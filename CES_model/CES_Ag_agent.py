@@ -3,12 +3,13 @@ import random
 import copy
 from collections import namedtuple, deque
 
-from Dmoney.CES_version.CES_A2C_Model import Actor, Critic
+from CES_model.CES_A2C_Model import Actor, Critic
 
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+# important! all of these somehow get imported into the class even if you just call the class from another script
 BUFFER_SIZE = int(1e6)  # replay buffer size
 BATCH_SIZE = 128  # minibatch size
 GAMMA = 0.99  # discount factor
@@ -68,7 +69,7 @@ class Agent:
     def act(self, state, add_noise=False):
         """Returns actions for given state as per current policy."""
 
-        # FIXME: THIS NEEDS TO BE UPDATED WITH NEW STATE VECTOR
+        # FIXME: THIS NEEDS TO BE UPDATED WITH NEW STATE VECTOR, MIGHT NOT NEED THIS?
         available_water = state[0]
 
         state = torch.from_numpy(state).float().to(device)

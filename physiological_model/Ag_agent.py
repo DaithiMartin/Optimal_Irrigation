@@ -3,7 +3,7 @@ import random
 import copy
 from collections import namedtuple, deque
 
-from Dmoney.Agg.A2C_Model import Actor, Critic
+from physiological_model.A2C_Model import Actor, Critic
 
 import torch
 import torch.nn.functional as F

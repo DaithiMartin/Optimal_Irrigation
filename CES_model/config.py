@@ -1,66 +1,29 @@
-import numpy as np
-from datetime import datetime
 
+import numpy as np
 
 class SimConfig:
-    """
-    Defines Configuration for Ag Simulator
-    """
-
+    # TODO: determine if i even need a config class. perhaps start without a config class then modularize as needed
     def __init__(self):
-        # Training parameters
-        self.num_episodes = 1000
-        self.avg_every = 10
-        self.save_every = 100
-        self.true_random = False
-        self.random_seed = None if self.true_random else 10
 
-        # Episode parameters
-        self.days_per_episode = 20  # growing season
-        self.num_crops = 2  # assumed equal distribution over land
-        self.num_farmers = 3
-        self.max_water = 1000  # discharge volume/time
-        self.min_water = 50  # discharge volume/time
-        self.crop_prices = [100, 50]
+        self.num_crops = 2
 
-        # order of agent priority
-        self.reversed_agent_priority = False
-        self.agent_priority = np.flip(
-            np.arange(self.num_farmers)).tolist() if self.reversed_agent_priority else np.arange(
-            self.num_farmers).tolist()
+        # TODO: use a dictionary to hold these values for different watersheds, then access watershed values via init argument
+        # hydrology function, current estimate based on lower Clark Fork
+        self.water_mu = 1.2e6       # cfs
+        self.water_sigma = 1e5      # cfs
+        self.water_dist = self.water_sigma * np.random.randn(100) + self.water_mu
 
-        # Crop and water functions
-        self.water_mu = 100
-        self.water_sigma = 20
-        self.source_water_function = self.water_sigma * np.random.randn(self.days_per_episode + 1) + self.water_mu
-
-        # Agent parameters
-        self.agent_type = "A2C"
-
-        # plotting parameters
-        self.colors = ['r-', 'b-', 'g-', 'c-', 'm-', 'y-', 'k-']
-
-    def __str__(self):
-        out_string = "Num Episodes: {:<6}   Days/episode: {}\n" \
-                     "Num Crops: {:<6}      Num Farmers: {}\n" \
-                     "Random: {}         Agent priority: {}"
-
-        return out_string.format(self.num_episodes, self.days_per_episode, self.num_crops, self.num_farmers,
-                                 self.true_random, self.agent_priority)
-
-    def plot_name(self):
-        return "plots/episodes_{}_random_{}_order_{}_agents_{}_{}.png".format(self.num_episodes,
-                                                                                   self.true_random,
-                                                                                   self.agent_priority,
-                                                                                   self.num_farmers,
-                                                                                   datetime.now()
-                                                                                   )
+        # simulation parameters
+        self.number_farmers = 3
+        self.farmer_priority = [0, 1, 2]
+        self.random_seed = 0
 
 
 
+        # agent parameters
+        # [available_water, available_land, crop_identity_vec, crop_price_vec]
+        # FIXME: THIS WILL NEED TO CHANGE WHEN self.crop_list CHANGES TO ONE HOT VECTOR
+        self.state_size = 2 + 2 * self.num_crops
+        self.action_size = 2 * self.num_crops
+        self.memory_size = 10
 
-
-# import matplotlib.pyplot as plt
-# x = np.arange(1000)
-# config = SimConfig
-# plt.plot(x, )

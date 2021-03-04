@@ -1,11 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from Dmoney.Agg.config import SimConfig
+from physiological_model.config import SimConfig
+
 
 class Multi_Farm_Sim:
     def __init__(self, config: SimConfig):
         # environment variables
-        self.state_size = 1 + 3 * config.num_crops     # [available_water
+        self.state_size = 1 + 3 * config.num_crops  # [available_water
         self.action_size = config.num_crops
 
         # episode variables
@@ -30,7 +30,6 @@ class Multi_Farm_Sim:
         self.crop_water = [[0 for i in range(self.num_crops)] for i in range(self.num_farmers)]
         self.crop_growth = [[0 for i in range(self.num_crops)] for i in range(self.num_farmers)]
         self.crop_prices = self.original_crop_prices
-
 
     def reset(self):
         """
@@ -68,11 +67,9 @@ class Multi_Farm_Sim:
         """
         total_removed = np.sum(action)
         for i in range(priority_index, len(self.available_water)):
-
             self.available_water[i] = max(self.available_water[i] - total_removed, 1e-3)
 
         return None
-
 
     def update_crop_water(self, priority_index, action):
         """
@@ -113,7 +110,6 @@ class Multi_Farm_Sim:
     def update_crop_price(self):
         """Updates crop prices with random market fluctuations and current expected supply"""
 
-
     def step(self, farmers):
         """
         Takes a step in the environment and updates all relevant instance attributes.
@@ -131,10 +127,10 @@ class Multi_Farm_Sim:
             self.source_available_water(self.day)
             for priority_index in self.agent_priority:
                 state = np.array(
-                                [self.available_water[priority_index]] +
-                                self.crop_water[priority_index] +
-                                self.crop_growth[priority_index] +
-                                self.crop_prices)
+                    [self.available_water[priority_index]] +
+                    self.crop_water[priority_index] +
+                    self.crop_growth[priority_index] +
+                    self.crop_prices)
 
                 action = list(farmers[priority_index].act(state))
                 self.update_available_water(priority_index, action)
@@ -142,10 +138,10 @@ class Multi_Farm_Sim:
                 self.update_crop_growth(priority_index, action)
                 reward = [0]
                 next_state = np.array(
-                                [self.available_water[priority_index]] +
-                                self.crop_water[priority_index] +
-                                self.crop_growth[priority_index] +
-                                self.crop_prices)
+                    [self.available_water[priority_index]] +
+                    self.crop_water[priority_index] +
+                    self.crop_growth[priority_index] +
+                    self.crop_prices)
                 farmers[priority_index].step(state, action, reward, next_state, self.done)
                 self.update_crop_price()
 
@@ -159,20 +155,20 @@ class Multi_Farm_Sim:
             self.source_available_water(self.day)
             for priority_index in self.agent_priority:
                 state = np.array(
-                                [self.available_water[priority_index]] +
-                                self.crop_water[priority_index] +
-                                self.crop_growth[priority_index] +
-                                self.crop_prices)
+                    [self.available_water[priority_index]] +
+                    self.crop_water[priority_index] +
+                    self.crop_growth[priority_index] +
+                    self.crop_prices)
                 action = farmers[priority_index].act(state)
                 self.update_available_water(priority_index, action)
                 self.update_crop_water(priority_index, action)
                 self.update_crop_growth(priority_index, action)
                 reward = np.sum(np.array(self.crop_growth[priority_index]) * self.crop_prices)
                 next_state = np.array(
-                                [self.available_water[priority_index]] +
-                                self.crop_water[priority_index] +
-                                self.crop_growth[priority_index] +
-                                self.crop_prices)
+                    [self.available_water[priority_index]] +
+                    self.crop_water[priority_index] +
+                    self.crop_growth[priority_index] +
+                    self.crop_prices)
                 farmers[priority_index].step(state, action, reward, next_state, self.done)
                 farmers[priority_index].update_memory(reward)
                 self.scores.append(np.sum(reward))
