@@ -15,7 +15,7 @@ Commonly:
 
 Activating your virtual environment:
 
-~ source venv/bin/activate
+~/ source venv/bin/activate
 
 To deactivate:
 
@@ -53,8 +53,15 @@ Adding files to .gitignore so that they are not tracked:
 
 (venv) ~/ echo "file_or_directory" >> .gitignore
 
-It is generally good to add the ./venv/ directory to the .gitignore 
+It is generally good to add the "venv/" directory to the .gitignore and just handle new build by initializing a new 
+virtual environment and using pip to install the dependencies from requirements.txt
 
-Add any remaining files to 
+Add any remaining files to tracked files
+
+(venv) ~/ git add .
+
+If you happen to add a file to tracked files and want to remove it:
+
+(venv) ~/ git rm -r --cached
 
 
