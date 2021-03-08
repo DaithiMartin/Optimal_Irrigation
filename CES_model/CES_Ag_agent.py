@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-# important! all of these somehow get imported into the class even if you just call the class from another script
+# important! all of get imported into the class even if you just call the class from another script
 BUFFER_SIZE = int(1e6)  # replay buffer size
 BATCH_SIZE = 128  # minibatch size
 GAMMA = 0.99  # discount factor
@@ -22,11 +22,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class Agent:
-    """Interacts with and learns from the environment."""
+    """Actor Critique RL agent with normal replay buffer"""
 
     def __init__(self, state_size, action_size, random_seed, pre_mem_size):
         """
-        Initialize an Agent object.
+        Initialize an Agent.
 
         Args:
             state_size (int): dimension of each state
@@ -37,17 +37,17 @@ class Agent:
         self.action_size = action_size
         self.seed = random.seed(random_seed)
 
-        # Actor Network (w/ Target Network)
+        # Actor networks
         self.actor_local = Actor(state_size, action_size, random_seed).to(device)
         self.actor_target = Actor(state_size, action_size, random_seed).to(device)
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR_ACTOR, weight_decay=WEIGHT_DECAY)
 
-        # Critic Network (w/ Target Network)
+        # Critic network
         self.critic_local = Critic(state_size, action_size, random_seed).to(device)
         self.critic_target = Critic(state_size, action_size, random_seed).to(device)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=LR_CRITIC, weight_decay=WEIGHT_DECAY)
 
-        # Noise process
+        # Noise component
         self.noise = OUNoise(action_size, random_seed)
 
         # Replay memory
@@ -56,8 +56,8 @@ class Agent:
 
     def step(self, state, action, reward, next_state, done):
         """Save experience in replay memory, and use random sample from buffer to learn."""
-        # Save experience / reward
 
+        # Save experience / reward
         self.pre_memory.append((state, action, reward, next_state, done))
         # self.memory.add(state, action, reward, next_state, done)
 
@@ -68,9 +68,6 @@ class Agent:
 
     def act(self, state, add_noise=False):
         """Returns actions for given state as per current policy."""
-
-        # FIXME: THIS NEEDS TO BE UPDATED WITH NEW STATE VECTOR, MIGHT NOT NEED THIS?
-        available_water = state[0]
 
         state = torch.from_numpy(state).float().to(device)
         self.actor_local.eval()
@@ -89,11 +86,11 @@ class Agent:
 
     def learn(self, experiences, gamma):
         """
-        Update policy and value parameters using given batch of experience tuples.
-        Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
-        where:
-            actor_target(state) -> action
-            critic_target(state, action) -> Q-value
+        Update policy and value networks from replay buffer.
+        Q_targets = reward + discount_gamma * critic_target(next_state, actor_target(next_state))
+        recall:
+            actor_target = action value function, state -> value, (distribution over actions)
+            critic_target = state value function, (state, action) -> new_state -> value
 
         Args:
             experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
@@ -113,6 +110,7 @@ class Agent:
         Q_expected = self.critic_local(states, actions)
         critic_loss = F.mse_loss(Q_expected, Q_targets)
 
+        # update network weights
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
@@ -122,6 +120,7 @@ class Agent:
         actions_pred = self.actor_local(states)
         actor_loss = -self.critic_local(states, actions_pred).mean()
 
+        # update network weights
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
@@ -133,7 +132,7 @@ class Agent:
     def soft_update(self, local_model, target_model, tau):
         """
         Soft update model parameters.
-        θ_target = τ*θ_local + (1 - τ)*θ_target
+        θ_target = tau*θ_local + (1 - tau)*θ_target
 
         Args:
             local_model: PyTorch model (weights will be copied from)
@@ -177,13 +176,13 @@ class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
     def __init__(self, action_size, buffer_size, batch_size, seed):
-        """Initialize a ReplayBuffer object.
+        """Initialize a ReplayBuffer.
         Args:
             buffer_size (int): maximum size of buffer
             batch_size (int): size of each training batch
         """
         self.action_size = action_size
-        self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
+        self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
         self.seed = random.seed(seed)
