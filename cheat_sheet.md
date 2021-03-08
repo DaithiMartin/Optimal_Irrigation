@@ -53,6 +53,9 @@ Adding files to .gitignore so that they are not tracked:
 
 (venv) ~/ echo "file_or_directory" >> .gitignore
 
+Here we use the ">>" as opposed to the ">" in the pip freeze command. One pipe ">" overwrites the entire file and a 
+double pipe ">>" will add to file. 
+
 It is generally good to add the "venv/" directory to the .gitignore and just handle new build by initializing a new 
 virtual environment and using pip to install the dependencies from requirements.txt
 
@@ -64,4 +67,5 @@ If you happen to add a file to tracked files and want to remove it:
 
 (venv) ~/ git rm -r --cached
 
-
+** this does not appear to be working exactly as intended. When tried on venv directory it removed pip functionality as well.
+this forced me to delete the venv and initialize a new one **
