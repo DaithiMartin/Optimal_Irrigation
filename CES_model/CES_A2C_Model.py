@@ -70,8 +70,8 @@ class Actor(nn.Module):
         # sigmoid gives us the proportion of total available water and land to be used
         # we call this utilized land and water
         x_total_head = F.relu(self.fc_total_head(x2))
-        total_water_proportion = torch.sigmoid(self.fc_total_water(x_total_head)) * max_water
-        total_land_proportion = torch.sigmoid(self.fc_total_land(x_total_head)) * max_land
+        total_water_proportion = torch.sigmoid(self.fc_total_water(x_total_head))
+        total_land_proportion = torch.sigmoid(self.fc_total_land(x_total_head))
 
         # distribution of resources over crops head
         # softmax over the two heads gives us the proportion of utilized land and water
