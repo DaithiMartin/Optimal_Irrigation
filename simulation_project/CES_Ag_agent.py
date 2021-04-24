@@ -3,15 +3,15 @@ import random
 import copy
 from collections import namedtuple, deque
 
-from CES_model.CES_A2C_Model import Actor, Critic
+from simulation_project.CES_A2C_Model import Actor, Critic
 
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
 # important! all of get imported into the class even if you just call the class from another script
-BUFFER_SIZE = int(1e6)  # replay buffer size
-BATCH_SIZE = 128  # minibatch size
+BUFFER_SIZE = int(10)  # replay buffer size
+BATCH_SIZE = 5  # minibatch size
 GAMMA = 0.99  # discount factor
 TAU = 1e-3  # for soft update of target parameters
 LR_ACTOR = 1e-4  # learning rate of the actor
@@ -24,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Agent:
     """Actor Critique RL agent with normal replay buffer"""
 
-    def __init__(self, state_size, action_size, random_seed, pre_mem_size):
+    def __init__(self, state_size, action_size, random_seed):
         """
         Initialize an Agent.
 
@@ -51,14 +51,14 @@ class Agent:
         self.noise = OUNoise(action_size, random_seed)
 
         # Replay memory
-        self.pre_memory = deque(maxlen=pre_mem_size)
+        # self.pre_memory = deque(maxlen=pre_mem_size)
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
 
     def step(self, state, action, reward, next_state, done):
         """Save experience in replay memory, and use random sample from buffer to learn."""
 
         # Save experience / reward
-        self.pre_memory.append((state, action, reward, next_state, done))
+        self.memory.add(state, action, reward, next_state, done)
         # self.memory.add(state, action, reward, next_state, done)
 
         # Learn, if enough samples are available in memory

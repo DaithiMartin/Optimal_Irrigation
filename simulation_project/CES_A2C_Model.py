@@ -60,6 +60,7 @@ class Actor(nn.Module):
             [batch, available_water, available_land, crops_encoding, cost_encoding]
         """
 
+        test_water = state.T[0]
         max_water = state.T[0].unsqueeze(-1)
         max_land = state.T[1].unsqueeze(-1)
 
@@ -82,7 +83,7 @@ class Actor(nn.Module):
         water_actions = max_water * total_water_proportion * crop_water_proportions
         land_actions = max_land * total_land_proportion * crop_land_proportions
 
-        return torch.cat((water_actions, land_actions), 0)
+        return torch.cat((water_actions, land_actions), -1)
 
 
 class Critic(nn.Module):
