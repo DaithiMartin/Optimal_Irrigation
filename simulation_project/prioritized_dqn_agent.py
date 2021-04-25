@@ -9,41 +9,9 @@ from simulation_project.CES_A2C_Model import Actor
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
-class DQNConfig():
-    """Configuration class for DQN"""
-
-    def __init__(self):
-        self.seed = 0
-
-        # training
-        self.n_episodes = 2000  # number of episodes
-        self.max_t = 1000  # maximum frames per game
-        self.update_every = 4  # number of frames before updating the network
-
-        # environment
-        self.state_size = 8
-        self.action_size = 4
-
-        # replay buffer
-        self.buffer_size = int(1e5)
-        self.batch_size = 64
-
-        # annealed parameters
-        self.eps_start = 1.0  # start epsilon for epsilon greedy policy
-        self.eps_end = 0.01  # epsilon final value
-        self.eps_decay = 0.995  # epsilon decay rate
-        self.beta = 0.0
-
-        # static parameters
-        self.learning_rate = 5e-4  # learning rate
-        self.gamma = 0.99  # expected future rewards discount
-        self.tau = 1e-3  # fixed target weighted average parameter
-
-
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4
 BUFFER_SIZE = int(1e5)
-BATCH_SIZE = 64
+BATCH_SIZE = 50
 UPDATE_EVERY = 4
 GAMMA = 0.99
 BETA = 0.0
@@ -57,13 +25,7 @@ class Agent:
 
         """
         Initializes Agent Object
-
         """
-        # self.state_size = config.state_size
-        # self.action_size = config.action_size
-        # self.seed = np.random.seed(config.seed)
-        # self.config = config
-
         self.action_size = action_size
 
         # Q-Network
@@ -76,6 +38,11 @@ class Agent:
 
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
+
+        # epsilon decay
+        self.eps = 1.0
+        self.eps_end = 0.1
+        self.eps_decay = 0.995
 
     def step(self, state, action, reward, next_state, done):
         """
@@ -99,7 +66,7 @@ class Agent:
                 experiences = self.memory.sample()
                 self.learn(experiences, GAMMA)
 
-    def act(self, state, eps=0.0):
+    def act(self, state, eps=0.1):
 
         """
         Chooses an action with epsilon greedy policy.
@@ -111,34 +78,34 @@ class Agent:
         Returns:
             int: action index
         """
-        max_water = state[0]
-        max_land = state[1]
+        max_yearly_water = state[1]
+        max_land = state[2]
         state = torch.from_numpy(state).float().to(device)
         self.qnetwork_local.eval()
         with torch.no_grad():
             action_values = self.qnetwork_local(state)
         self.qnetwork_local.train()
 
-        actions = action_values.cpu().max(1)[1].unsqueeze(1)
-
-        if actions.ndim == 3:
-            print("pause")
-
         water_values = action_values[0].cpu().data.numpy()
         land_values = action_values[1].cpu().data.numpy()
 
-        water_val = np.max(water_values)
-        land_val = np.max(land_values)
         water_action = np.argmax(water_values) / 100
         land_action = np.argmax(land_values) / 100
 
-        max_water_land = np.array(max_water, max_land)
+        max_water_land = np.array((max_yearly_water, max_land))
 
+        self.eps = max(self.eps_end, self.eps * self.eps_decay)
         # Epsilon-greedy action selection
-        if random.random() > eps:
+        if random.random() > self.eps:
             return np.array(water_action, land_action) * max_water_land
         else:
             return np.random.randint(0, 101, 2) / 100 * max_water_land
+
+        # # Epsilon-greedy action selection
+        # if random.random() > eps:
+        #     return np.array(water_action, land_action) * max_water_land
+        # else:
+        #     return np.random.randint(0, 101, 2) / 100 * max_water_land
 
     def learn(self, experiences, gamma):
         # type: (tuple, float) -> None

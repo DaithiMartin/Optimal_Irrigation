@@ -1,13 +1,6 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
-def hidden_init(layer):
-    fan_in = layer.weight.data.size()[0]
-    lim = 1. / np.sqrt(fan_in)
-    return (-lim, lim)
 
 
 class Actor(nn.Module):
@@ -35,37 +28,39 @@ class Actor(nn.Module):
         self.fc_land_head_1 = nn.Linear(fc_units, fc_units)
         self.fc_land_head_2 = nn.Linear(fc_units, 101)
 
+        self.dropout_1 = nn.Dropout(p=0.25)
+        self.dropout_2 = nn.Dropout(p=0.25)
+        self.dropout_3 = nn.Dropout(p=0.25)
+        self.dropout_4 = nn.Dropout(p=0.25)
 
-    # def reset_parameters(self):
-    #     self.fc1.weight.data.uniform_(-3e-3, 3e-3)
-    #     self.fc2.weight.data.uniform_(-3e-3, 3e-3)
-    #
-    #     self.fc_total_head.weight.data.uniform_(-3e-3, 3e-3)
-    #     self.fc_total_water.weight.data.uniform_(-3e-3, 3e-3)
-    #     self.fc_total_land.weight.data.uniform_(-3e-3, 3e-3)
-    #
-    #     self.fc_crop_head.weight.data.uniform_(-3e-3, 3e-3)
-    #     self.fc_crop_water.weight.data.uniform_(-3e-3, 3e-3)
-    #     self.fc_crop_land.weight.data.uniform_(-3e-3, 3e-3)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.fc1.weight.data.uniform_(-3e-3, 3e-3)
+        self.fc2.weight.data.uniform_(-3e-3, 3e-3)
+
+        self.fc_water_head_1.weight.data.uniform_(-3e-3, 3e-3)
+        self.fc_water_head_2.weight.data.uniform_(-3e-3, 3e-3)
+
+        self.fc_land_head_1.weight.data.uniform_(-3e-3, 3e-3)
+        self.fc_land_head_2.weight.data.uniform_(-3e-3, 3e-3)
+
+        return None
 
     def forward(self, state):
         """
-        Actor (policy) network that maps states -> action values! not actions
+        Policy network that maps states -> action values! not actions
 
         Args:
             state vector (torch.tensor):
             [batch, available_water, available_land, crops_encoding, cost_encoding]
         """
 
-        # FIXME: DONT THINK I NEED THESE ANYMORE
-        max_water = state.T[0].unsqueeze(-1)
-        max_land = state.T[1].unsqueeze(-1)
+        x1 = self.dropout_1(F.relu(self.fc1(state)))
+        x2 = self.dropout_2(F.relu(self.fc2(x1)))
 
-        x1 = F.relu(self.fc1(state))
-        x2 = F.relu(self.fc2(x1))
-
-        x_water = F.relu(self.fc_water_head_1(x2))
-        x_land = F.relu(self.fc_land_head_1(x2))
+        x_water = self.dropout_3(F.relu(self.fc_water_head_1(x2)))
+        x_land = self.dropout_4(F.relu(self.fc_land_head_1(x2)))
 
         water_values = self.fc_water_head_2(x_water)
         land_values = self.fc_land_head_2(x_land)

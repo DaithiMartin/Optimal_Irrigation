@@ -9,13 +9,22 @@ class SimConfig:
     """
 
     def __init__(self):
-        self.num_crops = 1
 
-        # TODO: use a dictionary to hold these values for different watersheds, then access watershed values via init argument
+        # general simulation parameters
+
+        self.num_years = 2000
+
+        # crop parameters
+        self.num_crops = 1
+        self.crop_1 = {"pi": 10,
+                       "beta_land": 0.5,
+                       "beta_water": 0.5,
+                       "rho": 1,
+                       "r": 1}
+
         # hydrology function, current estimate based on lower Clark Fork
         self.water_mu = 3e6  # cfs
-        self.water_sigma = 1e3  # cfs
-        self.aquifer_volume = 0 #self.water_mu * 2  # cf
+        self.water_sigma = 1e2  # cfs
 
         # stochastic water dist
         self.water_dist = self.water_sigma * np.random.randn(100) + self.water_mu
@@ -30,51 +39,9 @@ class SimConfig:
         # self.random_seed = None
 
         # agent parameters
-        # [available_water, available_land, crop_identity_vec, crop_price_vec]
-        # FIXME: THIS WILL NEED TO CHANGE WHEN self.crop_list CHANGES TO ONE HOT VECTOR
-        self.state_size = 3
+        self.state_size = 4
         self.action_size = 2 * self.num_crops
         self.memory_size = 10
-
-#%%
-
-class Aquifer:
-    # TODO: CURRENTLY THIS IS INCORPORATED IN THE SAME PRIORITY AS SURFACE WATER, CHANGING THIS MAY LEAD TO MORE INTERESTING DYNAMICS
-
-    def __init__(self, initial_volume):
-        self.available_volume = initial_volume
-        self.recharge_mu = initial_volume * 0.1
-        self.recharge_sigma = self.recharge_mu * 0.3
-
-    def withdraw_water(self, amount):
-        """
-        Withdraws water from the aquifer.
-        Currently allows for complete draining of the aquifer but prevents negative values.
-
-        Amount in the aquifer is unknown to the farmer and therefore is not in the agent's state vector.
-        :param amount: attempted water withdrawal
-        :return: actual amount withdrawn
-        """
-        if amount < self.available_volume:
-            self.available_volume -= amount
-
-            return amount
-
-        else:
-            amount = self.available_volume
-            self.available_volume = 0
-
-            return amount
-
-    def recharge_aquifer(self):
-        """
-        Stochastic recharge of the aquifer.
-        Currently based in independent distribution but could be tied to surface water.
-        :return: None
-        """
-        self.available_volume += np.random.randn() * self.recharge_sigma + self.recharge_mu
-
-        return None
 
 #%%
 
@@ -92,8 +59,8 @@ class SimulationCES:
 
         # simulation records for analysis
         self.farmers_rewards_record = [[] for _ in range(config.number_farmers)]
-        self.water_record = {"Aquifer": [],
-                             "Surface": []}
+        self.water_record = {"Surface": [],
+                             }
         self.farmers_water_withdrawal_record = [[] for _ in range(config.number_farmers)]
         self.farmers_actions_record = [[] for _ in range(config.number_farmers)]
         self.farmer_available_water_record = [[] for _ in range(config.number_farmers)]
@@ -103,35 +70,30 @@ class SimulationCES:
         self.farmer_priority = config.farmer_priority
         self.farmer_list = [Agent(config.state_size, config.action_size, config.random_seed) for _ in
                             range(self.num_farmers)]
+
+        # simulation state parameters
         self.year = 1
+        self.num_years = config.num_years
 
         # simulation functions, reward function is a property
         self.hydrology_function = config.water_dist
-        self.aquifer = Aquifer(config.aquifer_volume)
 
         # initialize river continuum
         self.source_water = self.init_available_water()
         self.available_water = [self.source_water for _ in range(self.num_farmers)]
 
         # land available to each farmer
-        # FIXME: MAKE THIS COME FROM CONFIG FILE?
         self.available_land = [100 for _ in range(self.num_farmers)]
 
-        # production function parameters
-        self.crop_1 = {"pi": 10,
-                       "beta_land": 0.5,
-                       "beta_water": 0.5,
-                       "rho": 1,
-                       "r": 1}
-        # self.crop_2 = {"pi": 10,
-        #                "beta_land": 0.3,
-        #                "beta_water": 0.7,
-        #                "rho": 1,
-        #                "r": 1}
+        # max water for each farmer, physical equipment constraint
+        self.max_yearly_water = [1.5e6 for _ in range(self.num_farmers)]
 
-        # TODO: THESE NEED TO GO INTO THE CONFIG CLASS
+        # production function parameters
+        self.crop_1 = config.crop_1
+
+
         self.crop_1_price = 10
-        self.crop_prices = [self.crop_1_price]
+
 
     def reset(self):
         """
@@ -143,10 +105,7 @@ class SimulationCES:
         Returns: None
         """
 
-        # recharge aquifer
-        self.aquifer.recharge_aquifer()
-
-        # re-initialize available water, this includes surface and aquifer
+        # re-initialize available water, this includes surface
         self.source_water = self.init_available_water()
         self.available_water = [self.source_water for _ in range(self.num_farmers)]
 
@@ -154,56 +113,44 @@ class SimulationCES:
 
     def reward_function(self, action):
 
-        # FIXME: DEAL WITH THIS UNPACKING MORE ELEGANTLY
         x1_water, x1_land = action
-        # FIXME: MAY INPUT A np.array FOR FLEXIBILITY
+
         """input amounts are the action space for the agents"""
         q_1 = self.crop_1["pi"] * (
                     self.crop_1["beta_land"] * (x1_land ** self.crop_1["rho"]) + self.crop_1["beta_water"] * (
                         x1_water ** self.crop_1["rho"])) ** (self.crop_1["r"] / self.crop_1["rho"])
-        # q_2 = self.crop_2["pi"] * (self.crop_2["beta_land"] * (x2_land ** self.crop_2["rho"]) + self.crop_2["beta_water"] * (x2_water ** self.crop_2["rho"])) ** (self.crop_2["r"] / self.crop_2["rho"])
 
-        # check for numerical stability
-        # if q_1 <= 0:
-        #     print(action)
-        r_1 = np.log(q_1 * self.crop_1_price + 1e-6)
-        # r_2 = q_2 * self.crop_2_price
+        # calc rewards
+        r_1 = np.log(q_1 * self.crop_1_price + 1e-3)
 
-        land_cost = self.land_cost_function(x1_land )
+        land_cost = self.land_cost_function(x1_land)
         water_cost = self.water_cost_function(x1_water)
         total_cost = land_cost + water_cost
 
-        # TODO: EXPAND THIS, it needs to be temporally correlated
         shadow_price = 0
 
         return r_1 - total_cost - shadow_price
 
+
+
     def water_cost_function(self, total_water):
         """
-        Non-Monotonic cost function for water.
-        Currently assumes that each land use has equivalent costs.
-
-
-        :param total_water:
+        Linear cost for water.
+        :param total_water: total water used for the farmer.
         :return: total water cost
         """
-        # TODO: ADJUST SO THAT THE COST FOR AQUIFER WITHDRAWALS IS DIFFERENT THAT SURFACE WATER
-        w_0 = 5e-6
-
+        w_0 = 3e-6
         cost = w_0 * total_water
 
         return cost
 
     def land_cost_function(self, total_land):
         """
-        Non-Monotonic cost function for land.
-        Currently assumes that each land use has equivalent costs.
-
-
-        :param total_land: total land used by the farmer for both crops.
+        Linear Cost for Land
+        :param total_land: total land used by the farmer.
         :return: total land cost
         """
-        w_0 = 5e-6
+        w_0 = 3e-6
 
         cost = w_0 * total_land
 
@@ -211,20 +158,9 @@ class SimulationCES:
 
     def plot_reward(self, crop):
 
-        # TODO: MAKE THIS FLEXIBLE TO PLOT DIFFERENT CROPS
-
-        # crop 1
         x_len = int(2e6)
-        # water crop 1
         water = np.arange(x_len) + 1
-        # water crop 2
-        # water = np.stack((water, np.zeros(x_len)), axis=-1)
-
-        # land crop 1, 100 total units available land for both crops
         land = np.full(x_len, 100)
-
-        # land crop 2
-        # land = np.stack((land, np.zeros(x_len)), axis=-1)
 
         # combine water and land
         action_vec = np.stack((water, land), axis=-1)
@@ -255,13 +191,11 @@ class SimulationCES:
         """
         # get initial values for water types
         surface_water = np.random.choice(self.hydrology_function)
-        aquifer = self.aquifer.available_volume
 
         # update water records
         self.water_record["Surface"].append(surface_water)
-        self.water_record["Aquifer"].append(aquifer)
 
-        return surface_water + aquifer
+        return surface_water
 
     def update_available_water(self, priority_index, action):
         """
@@ -275,11 +209,8 @@ class SimulationCES:
         total_removed = action[0]
         self.farmers_water_withdrawal_record[priority_index].append(total_removed)
 
-        # remove water from aquifer
-        aquifer_removed = self.aquifer.withdraw_water(total_removed / 2)
-
         # determine how much water needs to come from surface water
-        surface_removed = total_removed - aquifer_removed
+        surface_removed = total_removed
 
         # remove water from surface continuum, max operation prevents negative water amounts
         for i in range(priority_index, len(self.available_water)):
@@ -301,17 +232,20 @@ class SimulationCES:
         # iterate through farmers in their priority order
         for priority_num in self.farmer_priority:
             agent = self.farmer_list[priority_num]
+            if self.year == 1000:
+                agent.eps = 1
             state = np.concatenate((
                 [self.available_water[priority_num]],
+                [min(self.max_yearly_water[priority_num], self.available_water[priority_num])],
                 [self.available_land[priority_num]],
-                self.crop_prices)
+                [self.crop_1_price])
             )
 
             # record available water for this farmer
             self.farmer_available_water_record[priority_num].append(self.available_water[priority_num])
 
             # get action, and record actions for debugging
-            action = agent.act(state, eps=1.0)
+            action = agent.act(state)
             self.farmers_actions_record[priority_num].append(action)
 
             reward = self.reward_function(action)
@@ -323,10 +257,10 @@ class SimulationCES:
             # estimate next action and save state information in agent memory
             next_state = np.concatenate((
                 [self.available_water[priority_num]],
+                [min(self.max_yearly_water[priority_num], self.available_water[priority_num])],
                 [self.available_land[priority_num]],
-                self.crop_prices)
+                [self.crop_1_price])
             )
-            # TODO: ADJUST AGENT ALG TO REMOVE done STATE FIELD
             agent.step(state, action, reward, next_state, True)
 
 
@@ -340,9 +274,7 @@ config = SimConfig()
 config.farmer_priority = [0,1,2]
 env = SimulationCES(config)
 
-num_years = 1000
-
-for i_episode in range(1, num_years + 1):
+for i_episode in range(1, env.num_years + 1):
     env.step()
 
 
@@ -390,14 +322,7 @@ plt.plot(np.arange(len(average_available_water[2])), average_available_water[2],
 plt.legend()
 plt.show()
 
-#%%
-#
-# plt.title("Surface")
-# plt.plot(np.arange(env.year), env.water_record["Surface"])
-# plt.show()
 
-# #%%
-#
-# plt.title("Aquifer")
-# plt.plot(np.arange(env.year), env.water_record["Aquifer"])
-# plt.show()
+env.plot_reward(crop="crop 1")
+
+
