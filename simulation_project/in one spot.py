@@ -25,9 +25,9 @@ class SimConfig:
         # simulation parameters
         self.number_farmers = 3
         self.farmer_priority = [0, 1, 2]
-        # self.random_seed = 1 # seems like decent seed
+        self.random_seed = 1 # seems like decent seed
         # self.random_seed = 5  # pathological seed
-        self.random_seed = None
+        # self.random_seed = None
 
         # agent parameters
         # [available_water, available_land, crop_identity_vec, crop_price_vec]
@@ -350,27 +350,43 @@ for i_episode in range(1, num_years + 1):
 
 plt.xlabel("Year")
 plt.ylabel("Reward")
-plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[0], 'b-', label="Farmer 1")
-plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[1], 'r-', label="Farmer 2")
-plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[2], 'g-', label="Farmer 3")
+
+average_rewards = []
+for i, record in enumerate(env.farmers_rewards_record):
+    average_rewards.append(np.convolve(record, np.ones(100), 'valid') / 100)
+
+plt.plot(np.arange(len(average_rewards[0])), average_rewards[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(len(average_rewards[1])), average_rewards[1], 'r-', label="Farmer 2")
+plt.plot(np.arange(len(average_rewards[2])), average_rewards[2], 'g-', label="Farmer 3")
+
 plt.legend()
 plt.show()
 
 
 plt.xlabel("Year")
 plt.ylabel("Total Water Withdrawn")
-plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[0], 'b-', label="Farmer 1")
-plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[1], 'r-', label="Farmer 2")
-plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[2], 'g-', label="Farmer 3")
+
+average_water_withdrawal = []
+for i, record in enumerate(env.farmers_water_withdrawal_record):
+    average_water_withdrawal.append(np.convolve(record, np.ones(100), 'valid') / 100)
+
+plt.plot(np.arange(len(average_water_withdrawal[0])), average_water_withdrawal[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(len(average_water_withdrawal[1])), average_water_withdrawal[1], 'r-', label="Farmer 2")
+plt.plot(np.arange(len(average_water_withdrawal[2])), average_water_withdrawal[2], 'g-', label="Farmer 3")
 plt.legend()
 plt.show()
 
 #%%
 plt.xlabel("Year")
 plt.ylabel("Water Available to for each Farmer")
-plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[0], 'b-', label="Farmer 1")
-plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[1], 'rx-', label="Farmer 2")
-plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[2], 'g-', label="Farmer 3")
+
+average_available_water = []
+for i, record in enumerate(env.farmer_available_water_record):
+    average_available_water.append(np.convolve(record, np.ones(100), 'valid') / 100)
+
+plt.plot(np.arange(len(average_available_water[0])), average_available_water[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(len(average_available_water[1])), average_available_water[1], 'rx-', label="Farmer 2")
+plt.plot(np.arange(len(average_available_water[2])), average_available_water[2], 'g-', label="Farmer 3")
 plt.legend()
 plt.show()
 

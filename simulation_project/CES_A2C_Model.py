@@ -29,15 +29,12 @@ class Actor(nn.Module):
         self.fc1 = nn.Linear(state_size, fc_units)
         self.fc2 = nn.Linear(fc_units, fc_units)
 
-        self.fc_total_head = nn.Linear(fc_units, fc_units)
-        self.fc_total_water = nn.Linear(fc_units, 1)
-        self.fc_total_land = nn.Linear(fc_units, 1)
+        self.fc_water_head_1 = nn.Linear(fc_units, fc_units)
+        self.fc_water_head_2 = nn.Linear(fc_units, 101)
 
-        self.fc_crop_head = nn.Linear(fc_units, fc_units)
-        self.fc_crop_water = nn.Linear(fc_units, action_size // 2)
-        self.fc_crop_land = nn.Linear(fc_units, action_size // 2)
+        self.fc_land_head_1 = nn.Linear(fc_units, fc_units)
+        self.fc_land_head_2 = nn.Linear(fc_units, 101)
 
-        # self.reset_parameters()
 
     # def reset_parameters(self):
     #     self.fc1.weight.data.uniform_(-3e-3, 3e-3)
@@ -53,39 +50,27 @@ class Actor(nn.Module):
 
     def forward(self, state):
         """
-        Actor (policy) network that maps states -> actions.
+        Actor (policy) network that maps states -> action values! not actions
 
         Args:
             state vector (torch.tensor):
             [batch, available_water, available_land, crops_encoding, cost_encoding]
         """
 
-        test_water = state.T[0]
+        # FIXME: DONT THINK I NEED THESE ANYMORE
         max_water = state.T[0].unsqueeze(-1)
         max_land = state.T[1].unsqueeze(-1)
 
-        x_1 = F.relu(self.fc1(state))
-        x2 = F.relu(self.fc2(x_1))
+        x1 = F.relu(self.fc1(state))
+        x2 = F.relu(self.fc2(x1))
 
-        # total allocated resource head
-        # sigmoid gives us the proportion of total available water and land to be used
-        # we call this utilized land and water
-        x_total_head = F.relu(self.fc_total_head(x2))
-        water_check = self.fc_total_water(x_total_head)
-        total_water_proportion = torch.sigmoid(water_check)
-        land_check = self.fc_total_land(x_total_head)
-        total_land_proportion = torch.sigmoid(land_check)
+        x_water = F.relu(self.fc_water_head_1(x2))
+        x_land = F.relu(self.fc_land_head_1(x2))
 
-        # distribution of resources over crops head
-        # softmax over the two heads gives us the proportion of utilized land and water
-        x_crop_head = F.relu(self.fc_crop_head(x2))
-        crop_water_proportions = F.softmax(self.fc_crop_water(x_crop_head), dim=0)
-        crop_land_proportions = F.softmax(self.fc_crop_land(x_crop_head), dim=0)
+        water_values = self.fc_water_head_2(x_water)
+        land_values = self.fc_land_head_2(x_land)
 
-        water_actions = max_water * total_water_proportion * crop_water_proportions
-        land_actions = max_land * total_land_proportion * crop_land_proportions
-
-        return torch.cat((water_actions, land_actions), -1)
+        return torch.stack((water_values, land_values))
 
 
 class Critic(nn.Module):

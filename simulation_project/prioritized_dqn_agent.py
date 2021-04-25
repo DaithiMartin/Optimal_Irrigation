@@ -41,7 +41,7 @@ class DQNConfig():
         self.tau = 1e-3  # fixed target weighted average parameter
 
 
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-3
 BUFFER_SIZE = int(1e5)
 BATCH_SIZE = 64
 UPDATE_EVERY = 4
@@ -116,14 +116,29 @@ class Agent:
         state = torch.from_numpy(state).float().to(device)
         self.qnetwork_local.eval()
         with torch.no_grad():
-            action_values = self.qnetwork_local(state).cpu().data.numpy()
+            action_values = self.qnetwork_local(state)
         self.qnetwork_local.train()
+
+        actions = action_values.cpu().max(1)[1].unsqueeze(1)
+
+        if actions.ndim == 3:
+            print("pause")
+
+        water_values = action_values[0].cpu().data.numpy()
+        land_values = action_values[1].cpu().data.numpy()
+
+        water_val = np.max(water_values)
+        land_val = np.max(land_values)
+        water_action = np.argmax(water_values) / 100
+        land_action = np.argmax(land_values) / 100
+
+        max_water_land = np.array(max_water, max_land)
 
         # Epsilon-greedy action selection
         if random.random() > eps:
-            return action_values
+            return np.array(water_action, land_action) * max_water_land
         else:
-            return np.array((np.random.randint(0, max_water), np.random.randint(0, max_land)))
+            return np.random.randint(0, 101, 2) / 100 * max_water_land
 
     def learn(self, experiences, gamma):
         # type: (tuple, float) -> None
@@ -141,11 +156,16 @@ class Agent:
 
         sampling_weight = (1/BUFFER_SIZE * 1/probabilities) ** BETA / probabilities.squeeze().max(0)[0]
 
-        Q_target_undiscounted = self.qnetwork_target(next_states)
+        # get action value for the chosen action
+        Q_target_undiscounted = self.qnetwork_target(next_states).detach().max(2)[0].unsqueeze(2)
+
+        # then sum the value of the water and land heads
+        Q_target_undiscounted = torch.sum(Q_target_undiscounted, dim=0)
 
         Q_target = rewards + (gamma * Q_target_undiscounted * (1 - dones))
 
-        Q_estimate = self.qnetwork_local(states)
+        Q_estimate = self.qnetwork_local(states).max(2)[0].unsqueeze(2)
+        Q_estimate = torch.sum(Q_estimate, dim=0)
 
         loss = F.mse_loss(sampling_weight * Q_estimate, sampling_weight * Q_target)
         self.optimizer.zero_grad()
@@ -268,12 +288,12 @@ class ReplayBuffer:
         priority = (torch.abs(reward + td_error) + self.eta)
 
         for i, index in enumerate(self.indexes):
-            self.memory[index] = self.experience(state[i].numpy(),
-                                                 action[i].numpy(),
-                                                 reward[i].numpy(),
-                                                 next_state[i].numpy(),
-                                                 dones[i].numpy(),
-                                                 priority[i].item(),
+            self.memory[index] = self.experience(state[i].cpu().numpy(),
+                                                 action[i].cpu().numpy(),
+                                                 reward[i].cpu().numpy(),
+                                                 next_state[i].cpu().numpy(),
+                                                 dones[i].cpu().numpy(),
+                                                 priority[i].cpu().item(),
                                                  )
             self.priority_memory[index] = priority[i].item()
 
