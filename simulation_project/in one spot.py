@@ -78,8 +78,8 @@ class Aquifer:
 
 #%%
 
-from simulation_project.CES_Ag_agent import Agent
-
+# from simulation_project.CES_Ag_agent import Agent
+from simulation_project.prioritized_dqn_agent import Agent
 
 class SimulationCES:
     """
@@ -311,7 +311,7 @@ class SimulationCES:
             self.farmer_available_water_record[priority_num].append(self.available_water[priority_num])
 
             # get action, and record actions for debugging
-            action = agent.act(state)
+            action = agent.act(state, eps=1.0)
             self.farmers_actions_record[priority_num].append(action)
 
             reward = self.reward_function(action)
