@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+#%%
 
 class SimConfig:
     """
@@ -12,9 +13,9 @@ class SimConfig:
 
         # TODO: use a dictionary to hold these values for different watersheds, then access watershed values via init argument
         # hydrology function, current estimate based on lower Clark Fork
-        self.water_mu = 1.2e6  # cfs
+        self.water_mu = 3e6  # cfs
         self.water_sigma = 1e3  # cfs
-        self.aquifer_volume = self.water_mu * 2  # cf
+        self.aquifer_volume = 0 #self.water_mu * 2  # cf
 
         # stochastic water dist
         self.water_dist = self.water_sigma * np.random.randn(100) + self.water_mu
@@ -24,7 +25,9 @@ class SimConfig:
         # simulation parameters
         self.number_farmers = 3
         self.farmer_priority = [0, 1, 2]
-        self.random_seed = 0
+        # self.random_seed = 1 # seems like decent seed
+        # self.random_seed = 5  # pathological seed
+        self.random_seed = None
 
         # agent parameters
         # [available_water, available_land, crop_identity_vec, crop_price_vec]
@@ -93,6 +96,7 @@ class SimulationCES:
                              "Surface": []}
         self.farmers_water_withdrawal_record = [[] for _ in range(config.number_farmers)]
         self.farmers_actions_record = [[] for _ in range(config.number_farmers)]
+        self.farmer_available_water_record = [[] for _ in range(config.number_farmers)]
 
         # simulation parameters
         self.num_farmers = config.number_farmers
@@ -159,7 +163,10 @@ class SimulationCES:
                         x1_water ** self.crop_1["rho"])) ** (self.crop_1["r"] / self.crop_1["rho"])
         # q_2 = self.crop_2["pi"] * (self.crop_2["beta_land"] * (x2_land ** self.crop_2["rho"]) + self.crop_2["beta_water"] * (x2_water ** self.crop_2["rho"])) ** (self.crop_2["r"] / self.crop_2["rho"])
 
-        r_1 = np.log(q_1 * self.crop_1_price)
+        # check for numerical stability
+        # if q_1 <= 0:
+        #     print(action)
+        r_1 = np.log(q_1 * self.crop_1_price + 1e-6)
         # r_2 = q_2 * self.crop_2_price
 
         land_cost = self.land_cost_function(x1_land )
@@ -181,7 +188,7 @@ class SimulationCES:
         :return: total water cost
         """
         # TODO: ADJUST SO THAT THE COST FOR AQUIFER WITHDRAWALS IS DIFFERENT THAT SURFACE WATER
-        w_0 = 1e-5
+        w_0 = 5e-6
 
         cost = w_0 * total_water
 
@@ -196,7 +203,7 @@ class SimulationCES:
         :param total_land: total land used by the farmer for both crops.
         :return: total land cost
         """
-        w_0 = 1e-5
+        w_0 = 5e-6
 
         cost = w_0 * total_land
 
@@ -211,16 +218,16 @@ class SimulationCES:
         # water crop 1
         water = np.arange(x_len) + 1
         # water crop 2
-        water = np.stack((water, np.zeros(x_len)), axis=-1)
+        # water = np.stack((water, np.zeros(x_len)), axis=-1)
 
         # land crop 1, 100 total units available land for both crops
         land = np.full(x_len, 100)
 
         # land crop 2
-        land = np.stack((land, np.zeros(x_len)), axis=-1)
+        # land = np.stack((land, np.zeros(x_len)), axis=-1)
 
         # combine water and land
-        action_vec = np.concatenate((water, land), axis=-1)
+        action_vec = np.stack((water, land), axis=-1)
 
         y = []
         for action in action_vec:
@@ -265,7 +272,7 @@ class SimulationCES:
             action: amount of water removed by agent
         """
         # determine the total water removed
-        total_removed = np.sum(action[0:2])
+        total_removed = action[0]
         self.farmers_water_withdrawal_record[priority_index].append(total_removed)
 
         # remove water from aquifer
@@ -300,6 +307,9 @@ class SimulationCES:
                 self.crop_prices)
             )
 
+            # record available water for this farmer
+            self.farmer_available_water_record[priority_num].append(self.available_water[priority_num])
+
             # get action, and record actions for debugging
             action = agent.act(state)
             self.farmers_actions_record[priority_num].append(action)
@@ -319,6 +329,7 @@ class SimulationCES:
             # TODO: ADJUST AGENT ALG TO REMOVE done STATE FIELD
             agent.step(state, action, reward, next_state, True)
 
+
         # 1 year of simulation complete, reset the source water
         self.reset()
         self.year += 1
@@ -326,6 +337,7 @@ class SimulationCES:
 
 # for debugging
 config = SimConfig()
+config.farmer_priority = [0,1,2]
 env = SimulationCES(config)
 
 num_years = 1000
@@ -333,3 +345,43 @@ num_years = 1000
 for i_episode in range(1, num_years + 1):
     env.step()
 
+
+# red and green should be screwed
+
+plt.xlabel("Year")
+plt.ylabel("Reward")
+plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[1], 'r-', label="Farmer 2")
+plt.plot(np.arange(env.year - 1), env.farmers_rewards_record[2], 'g-', label="Farmer 3")
+plt.legend()
+plt.show()
+
+
+plt.xlabel("Year")
+plt.ylabel("Total Water Withdrawn")
+plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[1], 'r-', label="Farmer 2")
+plt.plot(np.arange(env.year - 1), env.farmers_water_withdrawal_record[2], 'g-', label="Farmer 3")
+plt.legend()
+plt.show()
+
+#%%
+plt.xlabel("Year")
+plt.ylabel("Water Available to for each Farmer")
+plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[0], 'b-', label="Farmer 1")
+plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[1], 'rx-', label="Farmer 2")
+plt.plot(np.arange(env.year - 1), env.farmer_available_water_record[2], 'g-', label="Farmer 3")
+plt.legend()
+plt.show()
+
+#%%
+#
+# plt.title("Surface")
+# plt.plot(np.arange(env.year), env.water_record["Surface"])
+# plt.show()
+
+# #%%
+#
+# plt.title("Aquifer")
+# plt.plot(np.arange(env.year), env.water_record["Aquifer"])
+# plt.show()
