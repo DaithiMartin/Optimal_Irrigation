@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from simulation_project.prioritized_dqn_agent import Agent
 
-#%%
+
+# %%
+
 
 class SimConfig:
     """
@@ -9,13 +12,12 @@ class SimConfig:
     """
 
     def __init__(self):
-
         # general simulation parameters
-
         self.num_years = 2000
 
         # crop parameters
         self.num_crops = 1
+        self.crop_1_price = 10
         self.crop_1 = {"pi": 10,
                        "beta_land": 0.5,
                        "beta_water": 0.5,
@@ -23,7 +25,7 @@ class SimConfig:
                        "r": 1}
 
         # hydrology function, current estimate based on lower Clark Fork
-        self.water_mu = 3e6  # cfs
+        self.water_mu = 0.75e6  # cfs
         self.water_sigma = 1e2  # cfs
 
         # stochastic water dist
@@ -34,19 +36,26 @@ class SimConfig:
         # simulation parameters
         self.number_farmers = 3
         self.farmer_priority = [0, 1, 2]
-        self.random_seed = 1 # seems like decent seed
-        # self.random_seed = 5  # pathological seed
-        # self.random_seed = None
+        # self.random_seed = 1    # seems like decent seed
+        self.random_seed = None
 
         # agent parameters
         self.state_size = 4
         self.action_size = 2 * self.num_crops
         self.memory_size = 10
 
+        # land and water physical constraints
+        # land available to each farmer
+        self.available_land = [100 for _ in range(self.number_farmers)]
+
+        # max water for each farmer, physical equipment constraint
+        self.max_yearly_water = [1.5e6 for _ in range(self.number_farmers)]
+
+        # experimental parameters
+        self.epsilon_test = False
+
 #%%
 
-# from simulation_project.CES_Ag_agent import Agent
-from simulation_project.prioritized_dqn_agent import Agent
 
 class SimulationCES:
     """
@@ -59,8 +68,7 @@ class SimulationCES:
 
         # simulation records for analysis
         self.farmers_rewards_record = [[] for _ in range(config.number_farmers)]
-        self.water_record = {"Surface": [],
-                             }
+        self.water_record = {"Surface": []}
         self.farmers_water_withdrawal_record = [[] for _ in range(config.number_farmers)]
         self.farmers_actions_record = [[] for _ in range(config.number_farmers)]
         self.farmer_available_water_record = [[] for _ in range(config.number_farmers)]
@@ -83,17 +91,17 @@ class SimulationCES:
         self.available_water = [self.source_water for _ in range(self.num_farmers)]
 
         # land available to each farmer
-        self.available_land = [100 for _ in range(self.num_farmers)]
+        self.available_land = config.available_land
 
         # max water for each farmer, physical equipment constraint
-        self.max_yearly_water = [1.5e6 for _ in range(self.num_farmers)]
+        self.max_yearly_water = config.max_yearly_water
 
         # production function parameters
         self.crop_1 = config.crop_1
+        self.crop_1_price = config.crop_1_price
 
-
-        self.crop_1_price = 10
-
+        # experimental parameters
+        self.epsilon_test = config.epsilon_test
 
     def reset(self):
         """
@@ -117,8 +125,8 @@ class SimulationCES:
 
         """input amounts are the action space for the agents"""
         q_1 = self.crop_1["pi"] * (
-                    self.crop_1["beta_land"] * (x1_land ** self.crop_1["rho"]) + self.crop_1["beta_water"] * (
-                        x1_water ** self.crop_1["rho"])) ** (self.crop_1["r"] / self.crop_1["rho"])
+                self.crop_1["beta_land"] * (x1_land ** self.crop_1["rho"]) + self.crop_1["beta_water"] * (
+                x1_water ** self.crop_1["rho"])) ** (self.crop_1["r"] / self.crop_1["rho"])
 
         # calc rewards
         r_1 = np.log(q_1 * self.crop_1_price + 1e-3)
@@ -130,8 +138,6 @@ class SimulationCES:
         shadow_price = 0
 
         return r_1 - total_cost - shadow_price
-
-
 
     def water_cost_function(self, total_water):
         """
@@ -232,8 +238,11 @@ class SimulationCES:
         # iterate through farmers in their priority order
         for priority_num in self.farmer_priority:
             agent = self.farmer_list[priority_num]
-            if self.year == 1000:
-                agent.eps = 1
+
+            # epsilon test
+            if self.epsilon_test and 1100 > self.year > 1000:
+                agent.eps = 0.75
+
             state = np.concatenate((
                 [self.available_water[priority_num]],
                 [min(self.max_yearly_water[priority_num], self.available_water[priority_num])],
@@ -263,7 +272,6 @@ class SimulationCES:
             )
             agent.step(state, action, reward, next_state, True)
 
-
         # 1 year of simulation complete, reset the source water
         self.reset()
         self.year += 1
@@ -271,16 +279,15 @@ class SimulationCES:
 
 # for debugging
 config = SimConfig()
-config.farmer_priority = [0,1,2]
+config.farmer_priority = [0, 1, 2]
 env = SimulationCES(config)
 
 for i_episode in range(1, env.num_years + 1):
     env.step()
 
-
 # red and green should be screwed
 
-plt.xlabel("Year")
+plt.xlabel("Iteration")
 plt.ylabel("Reward")
 
 average_rewards = []
@@ -294,8 +301,7 @@ plt.plot(np.arange(len(average_rewards[2])), average_rewards[2], 'g-', label="Fa
 plt.legend()
 plt.show()
 
-
-plt.xlabel("Year")
+plt.xlabel("Iteration")
 plt.ylabel("Total Water Withdrawn")
 
 average_water_withdrawal = []
@@ -308,8 +314,8 @@ plt.plot(np.arange(len(average_water_withdrawal[2])), average_water_withdrawal[2
 plt.legend()
 plt.show()
 
-#%%
-plt.xlabel("Year")
+# %%
+plt.xlabel("Iteration")
 plt.ylabel("Water Available to for each Farmer")
 
 average_available_water = []
@@ -322,7 +328,4 @@ plt.plot(np.arange(len(average_available_water[2])), average_available_water[2],
 plt.legend()
 plt.show()
 
-
-env.plot_reward(crop="crop 1")
-
-
+# env.plot_reward(crop="crop 1")

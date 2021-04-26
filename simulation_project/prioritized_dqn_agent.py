@@ -5,7 +5,7 @@ import numpy as np
 import random
 from collections import namedtuple, deque
 
-from simulation_project.CES_A2C_Model import Actor
+from simulation_project.CES_PDQN_Model import Actor
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
