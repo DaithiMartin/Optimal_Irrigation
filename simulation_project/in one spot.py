@@ -328,4 +328,4 @@ plt.plot(np.arange(len(average_available_water[2])), average_available_water[2],
 plt.legend()
 plt.show()
 
-# env.plot_reward(crop="crop 1")
+env.plot_reward(crop="crop 1")
